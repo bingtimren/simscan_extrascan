@@ -1,0 +1,33 @@
+Usage:
+======================================================
+If environment variable SIMSCAN_EXTRASCAN is present, this patch makes simscan to execute the content of the variable 
+with a popen call, i.e. by a shell. The user executing the command will be 'vpopmail' and the current dir is a working
+dir, into which simscan has put the message as well as attachments extracted by ripmime. The command can simply inspect
+the message or attachment and return 0 if inspection is OK or other code if intend to block the message.
+
+Note: 'vpopmail' will run the command but attachment is owned and only readable by simscan, therefore the command will
+not be able to inspect attachment. My solution is to allow vpopmail sudo as simscan to inspect the attachment. To do
+this, administrator needs to edit the sudo configuration (use /usr/sbin/visudo) and make the following two changes:
+
+Change 1: comment out "requiretty" since no tty is available
+
+# Defaults    requiretty
+
+Change 2: allow vpopmail run as simscan in executing necessary commands (for example, zipinfo)
+
+# vpopmail will be able to call zipinfo anywhere (EXAMPLE)
+vpopmail        ALL=(simscan) NOPASSWD: /usr/bin/zipinfo
+
+Below are samples of extra-scanner commands
+======================================================
+1.block 'exe in zip' with logging (adjust max zip-file size, 800000 in this case, before applying)
+
+SIMSCAN_EXTRASCAN='logger "simscan-extrascan: working on dir `pwd`";for i in *.zip;do logger "simscan-extrascan: checking $i";if [ $(stat -c%s $i) -lt 800000 ];then if sudo -u simscan /usr/bin/zipinfo -1 $i 2>&1|/bin/grep -i exe$ >/dev/null;then logger "simscan-extrascan: exe found in $i, exiting 1";exit 1;else logger "simscan-extrascan: $i clean";fi;else logger "simscan-extrascan: $i too large, ignore";fi;done;logger "simscan-extrascan: all clean, exiting 0";exit 0'
+
+(requires configuration of sudo, see above)
+
+2. block 'exe in zip' without logging (adjust max zip-file size before applying)
+
+SIMSCAN_EXTRASCAN='for i in *.zip;do if [ $(stat -c%s $i) -lt 7200000 ];then if sudo -u simscan /usr/bin/zipinfo -1 $i 2>&1|/bin/grep -i \\.exe$ >/dev/null;then exit 1;fi;fi;done;exit 0'
+
+(requires configuration of sudo, see above)

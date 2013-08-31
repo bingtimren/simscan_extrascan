@@ -1,0 +1,55 @@
+--- simscan-1.4.0/simscan.c	2007-10-29 22:15:05.000000000 +0800
++++ simscan-1.4.0-extrascan/simscan.c	2013-08-31 12:30:15.000000000 +0800
+@@ -103,6 +103,9 @@
+ char *replace(char *string, char *oldpiece, char *newpiece);
+ int DebugFlag = 0;
+ 
++/* simscan_extrascan: extra-scan command from environment variable */
++char *extrascan_cmd;
++
+ /* To/From address processing globals */
+ #define MAX_RCPT_TO 255
+ #define MAX_EMAIL 500
+@@ -248,7 +251,7 @@
+ 
+   /* print out version information if requested */
+   if ( argc > 1 && strcmp(argv[1],"-v" )==0 ) {
+-    printf("simscan version: %s\n", VERSION);
++    printf("simscan version: %s (with extrascan-patch v0.2)\n", VERSION);
+     exit(0);
+   }
+ 
+@@ -266,6 +269,9 @@
+   if ( (tmpstr=getenv("SIMSCAN_DEBUG"))!=NULL ) {
+     DebugFlag = atoi(tmpstr);
+   }
++
++  /* simscan_extrascan: get extra scan command from environment */
++  extrascan_cmd=getenv("SIMSCAN_EXTRASCAN");
+   
+ #ifdef ENABLE_ATTACH
+   init_attach();
+@@ -1684,6 +1690,23 @@
+   mydir = opendir(".");
+   if ( mydir==NULL) return(0);
+ 
++  /* simscan_extrascan: execute extra scan! */
++  if (extrascan_cmd != NULL) {
++      if ( DebugFlag > 2 ) fprintf(stderr, "simscan: extra-scan command is: %s\n", extrascan_cmd );
++      int ret = -1;
++      FILE *scanoutput = popen(extrascan_cmd, "r");
++      ret = pclose(scanoutput);
++
++      if (ret != 0) {
++          if ( DebugFlag > 2 ) fprintf(stderr, "simscan: extra-scan UNCLEAN, returned %d\n", ret );
++          closedir(mydir);
++          return(1);
++      };
++      if ( DebugFlag > 2 ) fprintf(stderr, "simscan: extra-scan clean.\n" );
++   };
++   /* simscan_extrascan: end extrascan execution */
++
++
+   while((mydirent=readdir(mydir))!=NULL) {
+     /* skip . and .. */
+     if (  mydirent->d_name[0] == '.' && 
